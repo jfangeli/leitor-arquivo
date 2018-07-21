@@ -43,9 +43,12 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import br.com.ntconsulting.leitorarquivo.model.Cliente;
 import br.com.ntconsulting.leitorarquivo.model.ClienteArquivo;
+import br.com.ntconsulting.leitorarquivo.model.Venda;
+import br.com.ntconsulting.leitorarquivo.model.VendaArquivo;
 import br.com.ntconsulting.leitorarquivo.model.Vendedor;
 import br.com.ntconsulting.leitorarquivo.model.VendedorArquivo;
 import br.com.ntconsulting.leitorarquivo.processor.ClienteItemProcessador;
+import br.com.ntconsulting.leitorarquivo.processor.VendaItemProcessador;
 import br.com.ntconsulting.leitorarquivo.processor.VendedorItemProcessador;
 import br.com.ntconsulting.leitorarquivo.service.JobArquivoListener;
 
@@ -135,6 +138,51 @@ public class BatchConfig {
 				.next(stepCliente)
 				.build();
 	}
+	
+	@Bean("stepVenda")
+	public Step stepVenda(ItemReader<VendaArquivo> reader, ItemProcessor<VendaArquivo, Venda> processor,
+			ItemWriter<Venda> writer) {
+		return stepBuilderFactory.get("stepVenda")
+				.<VendaArquivo, Venda>chunk(100)
+				.reader(reader)
+				.processor(processor)
+				// .startLimit(3)
+				.writer(writer).build();
+	}
+		
+	@Bean
+    public FlatFileItemReader<VendaArquivo> readerVenda() {
+        definirArquivo();
+		FileSystemResource resource = new FileSystemResource(getArquivo());
+        FlatFileItemReaderBuilder<VendaArquivo> builder =  new FlatFileItemReaderBuilder<VendaArquivo>()
+                .name("vendaItemReader")
+                .resource(resource)
+                .delimited()
+                .delimiter("ç")
+                .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
+        
+        builder.fieldSetMapper(new VendaArquivo.VendaFieldSetMapper(resource.getFilename()));
+        return builder.build();        
+    }
+
+    @Bean
+    public VendaItemProcessador processorVenda() {
+        return new VendaItemProcessador();
+    }
+
+    
+    @Bean
+	public JdbcBatchItemWriter<Venda> writerVenda(@Qualifier("bDataSource") DataSource dataSource) {
+		
+    	return new JdbcBatchItemWriterBuilder<Venda>()
+				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
+				.sql("INSERT INTO venda (id, arquivo, nomeVendedor) VALUES (:id, :arquivo, :nomeVendedor)")
+				.sql("INSERT INTO venda_item (id, quantidade, preco, venda_id) VALUES (:id, :quantidade, :preco, :venda_id)")				
+				.dataSource(dataSource)
+				.build();
+	}
+	
+	
 
 	@Bean("stepCliente")
 	public Step stepCliente(ItemReader<ClienteArquivo> reader, ItemProcessor<ClienteArquivo, Cliente> processor,

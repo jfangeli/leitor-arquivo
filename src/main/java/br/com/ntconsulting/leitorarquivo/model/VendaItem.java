@@ -2,11 +2,22 @@ package br.com.ntconsulting.leitorarquivo.model;
 
 import java.math.BigDecimal;
 
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+
+@Entity
 public class VendaItem {
 
+	@Id
 	private Long id;
 	private Integer quantidade;
 	private BigDecimal preco;
+
+	@ManyToOne
+	@JoinColumn(name = "venda_id")
+	private Venda venda;
 
 	public VendaItem() {
 		super();
@@ -44,9 +55,17 @@ public class VendaItem {
 		this.preco = preco;
 	}
 
+	public Venda getVenda() {
+		return venda;
+	}
+
+	public void setVenda(Venda venda) {
+		this.venda = venda;
+	}
+
 	@Override
 	public String toString() {
-		return "VendaItem [id=" + id + ", quantidade=" + quantidade + ", preco=" + preco + "]";
+		return "VendaItem [id=" + id + ", quantidade=" + quantidade + ", preco=" + preco + ", venda=" + venda + "]";
 	}
 
 }

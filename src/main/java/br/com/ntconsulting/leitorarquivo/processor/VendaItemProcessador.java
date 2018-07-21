@@ -13,7 +13,6 @@ import org.springframework.batch.item.ItemProcessor;
 import br.com.ntconsulting.leitorarquivo.model.Venda;
 import br.com.ntconsulting.leitorarquivo.model.VendaArquivo;
 import br.com.ntconsulting.leitorarquivo.model.VendaItem;
-import br.com.ntconsulting.leitorarquivo.model.Vendedor;
 
 public class VendaItemProcessador implements ItemProcessor<VendaArquivo, Venda> {
 
@@ -27,31 +26,31 @@ public class VendaItemProcessador implements ItemProcessor<VendaArquivo, Venda> 
     	}
 		
 		final String nomeVendedor = vendaArquivo.getNomeVendedor().toUpperCase();
-		final String itens = vendaArquivo.getVendaItens();
 
-		final Vendedor vendedor = new Vendedor(null, null, nomeVendedor, null);
-
-		final Venda vendaProcessada = new Venda(null, vendaArquivo.getId(), vendedor,
-				processarItensVenda(vendaArquivo.getVendaItens()));
+		final Venda vendaProcessada = new Venda(vendaArquivo.getNomeArquivo(), 
+				vendaArquivo.getId(), 
+				nomeVendedor);
+		
+		vendaProcessada.setItens( processarItensVenda(vendaArquivo.getVendaItens(), vendaProcessada) );
 
 		log.debug("Venda processada de (" + vendaArquivo + ") para (" + vendaProcessada + ")");
 
 		return vendaProcessada;
 	}
 
-	private List<VendaItem> processarItensVenda(String itens) {
+	private List<VendaItem> processarItensVenda(String itens, Venda venda) {
 		final List<VendaItem> retorno = new ArrayList<VendaItem>();
 
 		if (null != itens && !itens.trim().isEmpty()) {
 			itens = itens.replace("[", "").replace("]", "");
 			retorno.addAll(
-					Arrays.stream(itens.split(",")).map(item -> criarVendaItem(item)).collect(Collectors.toList()));
+					Arrays.stream(itens.split(",")).map(item -> criarVendaItem(item, venda)).collect(Collectors.toList()));
 		}
 
 		return retorno;
 	}
 
-	protected VendaItem criarVendaItem(final String item) {
+	protected VendaItem criarVendaItem(final String item, Venda venda) {
 		final VendaItem retorno = new VendaItem();
 
 		if (null != item && !item.trim().isEmpty()) {
@@ -59,6 +58,7 @@ public class VendaItemProcessador implements ItemProcessor<VendaArquivo, Venda> 
 			retorno.setId(Long.valueOf(dados[0]));
 			retorno.setQuantidade(Integer.valueOf(dados[1]));
 			retorno.setPreco(new BigDecimal(dados[2]));
+			retorno.setVenda(venda);
 		}
 
 		return retorno;
