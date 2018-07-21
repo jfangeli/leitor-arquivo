@@ -60,31 +60,91 @@ public class BatchConfig {
 	@Autowired
 	public StepBuilderFactory stepBuilderFactory;
 
+	// @ConfigurationProperties(prefix = "spring.data.datasource")
+	@Bean(name = "bDataSource")
+	public DataSource datasource() {
+		return DataSourceBuilder.create().driverClassName("org.postgresql.Driver")
+				.url("jdbc:postgresql://localhost:5432/leitor-arquivo").username("dev").password("12qwaszx").build();
+	}
+
+	@Bean("bJpaVendor")
+	public JpaVendorAdapter jpaVendorAdapter() {
+		HibernateJpaVendorAdapter jpaVendorAdapter = new HibernateJpaVendorAdapter();
+		jpaVendorAdapter.setDatabase(Database.POSTGRESQL);
+		jpaVendorAdapter.setGenerateDdl(true);
+		jpaVendorAdapter.setShowSql(true);
+		jpaVendorAdapter.setDatabasePlatform("org.hibernate.dialect.PostgreSQLDialect");
+		return jpaVendorAdapter;
+	}
 	
+	@Bean("bEntityManager")
+	public LocalContainerEntityManagerFactoryBean entityManagerFactory(
+			@Qualifier("bDataSource") DataSource dataSource,
+			@Qualifier("bJpaVendor") JpaVendorAdapter jpaVendorAdapter) {
+
+		LocalContainerEntityManagerFactoryBean lef = new LocalContainerEntityManagerFactoryBean();
+		lef.setPackagesToScan("br.com.ntconsulting.leitorarquivo.model");
+		lef.setDataSource(dataSource);
+		lef.setJpaVendorAdapter(jpaVendorAdapter);
+		//lef.setJpaProperties(new Properties());		
+		return lef;
+	}
 	
-//	@Bean
-//	public FlatFileItemReader flatFileItemReader(@Value("${input.file.name}") String name) {
-//	        return new FlatFileItemReaderBuilder<Foo>()
-//	                        .name("flatFileItemReader")
-//	                        .resource(new FileSystemResource(name))
-//	                        ...
-//	}
+	@Bean("bTransactionManager")
+	public PlatformTransactionManager transactionManager(@Qualifier("bEntityManager") EntityManagerFactory entityManager) {
+		return new JpaTransactionManager(entityManager);
+	}
 	
-//	@Bean
-//	public MultiResourceItemReader multiResourceReader() {
-//	        return new MultiResourceItemReaderBuilder<Foo>()
-//	                                        .delegate(flatFileItemReader())
-//	                                        .resources(resources())
-//	                                        .build();
-//	}
+	@Bean("bJobRepository")
+	public JobRepository createJobRepository(@Qualifier("bDataSource") DataSource dataSource, 
+			@Qualifier("bTransactionManager") PlatformTransactionManager transactionManager) throws Exception {
+		JobRepositoryFactoryBean factory = new JobRepositoryFactoryBean();
+		factory.setDataSource(dataSource);
+		//factory.setDatabaseType("");
+		factory.setTransactionManager(transactionManager);
+		factory.setIsolationLevelForCreate("ISOLATION_SERIALIZABLE");
+		factory.setTablePrefix("BATCH_");
+		factory.setMaxVarCharLength(1000);
+		return factory.getObject();
+	}
+	
+	@Bean
+	public JobLauncher createJobLauncher(@Qualifier("bJobRepository") JobRepository jobRepository) throws Exception {
 		
+		SimpleJobLauncher jobLauncher = new SimpleJobLauncher();
+		jobLauncher.setJobRepository(jobRepository);
+		jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());
+		jobLauncher.afterPropertiesSet();
+		return jobLauncher;
+	}
+	
+	@Bean
+	public Job processarArquivo(@Qualifier("bJobRepository") JobRepository jobRepository, 
+			JobArquivoListener listener, 
+			@Qualifier("stepVendedor") Step stepVendedor) {
+		
+		return jobBuilderFactory.get("importUserJob")
+				.repository(jobRepository)
+				.incrementer(new RunIdIncrementer())
+				.listener(listener)
+				.start(stepVendedor)
+				//.next(processarVendedores)
+				.build();
+	}
+
+	@Bean("stepVendedor")
+	public Step stepVendedor(ItemReader<VendedorArquivo> reader, ItemProcessor<VendedorArquivo, Vendedor> processor,
+			ItemWriter<Vendedor> writer) {
+		return stepBuilderFactory.get("stepVendedor").<VendedorArquivo, Vendedor>chunk(100).reader(reader)
+				.processor(processor)
+				// .startLimit(3)
+				.writer(writer).build();
+	}
+	
 	@Bean
     public FlatFileItemReader<VendedorArquivo> readerVendedor() {
-        String arquivo = System.getProperty("diretorio") + System.getProperty("arquivo");
-		
-        FileSystemResource resource = new FileSystemResource(arquivo);
-        
-        
+        definirArquivo();
+		FileSystemResource resource = new FileSystemResource(getArquivo());
         FlatFileItemReaderBuilder<VendedorArquivo> builder =  new FlatFileItemReaderBuilder<VendedorArquivo>()
                 .name("vendedorItemReader")
                 .resource(resource)
@@ -101,13 +161,7 @@ public class BatchConfig {
         return new VendedorItemProcessador();
     }
     
-//    @Bean
-//    public JpaItemWriter<Vendedor> writerVendedor(@Qualifier("bEntityManager") LocalContainerEntityManagerFactoryBean entityManager){
-//    	JpaItemWriter<Vendedor> writer = new JpaItemWriter<Vendedor>();
-//        writer.setEntityManagerFactory(entityManager.getObject());
-//        return writer;
-//    }
-    
+
     @Bean
 	public JdbcBatchItemWriter<Vendedor> writerVendedor(@Qualifier("bDataSource") DataSource dataSource) {
 		return new JdbcBatchItemWriterBuilder<Vendedor>()
@@ -116,135 +170,34 @@ public class BatchConfig {
 				.build();
 	}
 	
+	protected String getArquivo() {
+		return System.getProperty("diretorio") +"/"+ System.getProperty("arquivo");
+	}
 	
-	@Bean
-	public Job processarArquivo(@Qualifier("bJobRepository") JobRepository jobRepository, 
-			JobArquivoListener listener, 
-			@Qualifier("stepVendedor") Step stepVendedor) {
+	protected String getNomeArquivo() {
+		return System.getProperty("arquivo");
+	}
+    
+	protected  void definirArquivo() {
+		String diretorio = System.getProperty("diretorio");
+		String arquivo = System.getProperty("arquivo");
 		
-		String diretorio = System.getenv("HOMEPATH") + "/data";	
-		System.setProperty("diretorio", diretorio);
+		if(null == diretorio || null == arquivo) {
+			diretorio = System.getenv("HOMEPATH") + "/data";	
+			System.setProperty("diretorio", diretorio);
+			
+			File file = new File(diretorio);
+			File[] f = file.listFiles(new FilenameFilter() {
+			    @Override
+			    public boolean accept(File dir, String name) {
+			        name.toUpperCase().endsWith(".DAT");
+			        return true;
+			    }
+			});
+			
+			System.setProperty("arquivo",(f.length>0 ? f[0].getName() : ""));
+		}
 		
-		File file = new File(diretorio);
-		File[] f = file.listFiles(new FilenameFilter() {
-		    @Override
-		    public boolean accept(File dir, String name) {
-		        name.endsWith(".dat");
-		        return false;
-		    }
-		});
-		
-		System.setProperty("aquivo",(f.length>0 ? f[0].getName() : ""));
-		
-		return jobBuilderFactory.get("importUserJob")
-				.repository(jobRepository)
-				.incrementer(new RunIdIncrementer())
-				.listener(listener)
-				.start(stepVendedor)
-				//.next(processarVendedores)
-				.build();
 	}
 
-//	@Bean
-//	public Step stepVendedor(JdbcBatchItemWriter<Vendedor> writer) {
-//		return stepBuilderFactory.get("processarVendedores")
-//				.<Vendedor, Vendedor>chunk(10)
-//				.reader(readerVendedor())
-//				.processor(processorVendedor())
-//				//.startLimit(3)
-//				.writer(writer).build();
-//	}
-	
-	
-//	@Bean
-//    public Step step1(StepBuilderFactory stepBuilderFactory, ItemReader<Account> reader,
-//                      ItemWriter<Person> writer, ItemProcessor<Account, Person> processor) {
-//        return stepBuilderFactory.get("step1")
-//                .<Account, Person>chunk(1000)
-//                .reader(reader)
-//                .processor(processor)
-//                .writer(writer)
-//                .build();
-//    }
-	
-
-	@Bean("stepVendedor")
-	public Step stepVendedor(ItemReader<VendedorArquivo> reader, 
-			ItemProcessor<VendedorArquivo, Vendedor> processor,
-			ItemWriter<Vendedor> writer) {
-		return stepBuilderFactory.get("stepVendedor")
-				.<VendedorArquivo, Vendedor>chunk(100)
-				.reader(reader)
-				.processor(processor)
-				//.startLimit(3)
-				.writer(writer).build();
-	}
-	
-	
-	@Bean
-	public JobLauncher createJobLauncher(@Qualifier("bJobRepository") JobRepository jobRepository) throws Exception {
-		SimpleJobLauncher jobLauncher = new SimpleJobLauncher();
-		jobLauncher.setJobRepository(jobRepository);
-		jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());
-		jobLauncher.afterPropertiesSet();
-		return jobLauncher;
-	}
-
-	@Bean("bJobRepository")
-	public JobRepository createJobRepository(@Qualifier("bDataSource") DataSource dataSource, 
-			@Qualifier("bTransactionManager") PlatformTransactionManager transactionManager) throws Exception {
-		JobRepositoryFactoryBean factory = new JobRepositoryFactoryBean();
-		factory.setDataSource(dataSource);
-		//factory.setDatabaseType("");
-		factory.setTransactionManager(transactionManager);
-		factory.setIsolationLevelForCreate("ISOLATION_SERIALIZABLE");
-		factory.setTablePrefix("BATCH_");
-		factory.setMaxVarCharLength(1000);
-		return factory.getObject();
-	}
-	
-	
-	@Bean("bTransactionManager")
-	public PlatformTransactionManager transactionManager(@Qualifier("bEntityManager") EntityManagerFactory entityManager) {
-		return new JpaTransactionManager(entityManager);
-	}
-	
-	
-	//@ConfigurationProperties(prefix = "spring.data.datasource")
-	@Bean(name = "bDataSource")
-	public DataSource datasource() {
-		return DataSourceBuilder.create()
-				.driverClassName("org.postgresql.Driver")
-				.url("jdbc:postgresql://localhost:5432/leitor-arquivo")
-				.username("dev")
-				.password("12qwaszx")
-				.build();
-	}
-	
-	@Bean("bJpaVendor")
-	public JpaVendorAdapter jpaVendorAdapter() {
-		HibernateJpaVendorAdapter jpaVendorAdapter = new HibernateJpaVendorAdapter();
-		jpaVendorAdapter.setDatabase(Database.POSTGRESQL);
-		jpaVendorAdapter.setGenerateDdl(true);
-		jpaVendorAdapter.setShowSql(true);		
-        jpaVendorAdapter.setDatabasePlatform("org.hibernate.dialect.PostgreSQLDialect");
-		return jpaVendorAdapter;
-	}
-	
-	@Bean("bEntityManager")
-	public LocalContainerEntityManagerFactoryBean entityManagerFactory(
-			@Qualifier("bDataSource") DataSource dataSource,
-			@Qualifier("bJpaVendor") JpaVendorAdapter jpaVendorAdapter) {
-
-		LocalContainerEntityManagerFactoryBean lef = new LocalContainerEntityManagerFactoryBean();
-		lef.setPackagesToScan("br.com.ntconsulting.leitorarquivo.model");
-		lef.setDataSource(dataSource);
-		lef.setJpaVendorAdapter(jpaVendorAdapter);
-		//lef.setJpaProperties(new Properties());		
-		return lef;
-	}
-
-	
-	
-	
 }
