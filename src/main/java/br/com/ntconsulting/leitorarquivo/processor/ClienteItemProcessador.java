@@ -22,7 +22,7 @@ public class ClienteItemProcessador implements ItemProcessor<ClienteArquivo, Cli
     	final String nome = cliente.getNome().toUpperCase();
     	final String area = cliente.getAreaNegocio().toUpperCase();
         
-        final Cliente clienteProcessado = new Cliente(null, cliente.getCnpj(), nome, area);
+        final Cliente clienteProcessado = new Cliente(cliente.getNomeArquivo(), cliente.getCnpj(), nome, area);
 
         log.debug("Cliente processado de (" + cliente + ") para (" + clienteProcessado + ")");
 

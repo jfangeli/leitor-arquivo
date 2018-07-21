@@ -1,7 +1,15 @@
 package br.com.ntconsulting.leitorarquivo.model;
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+@Entity
 public class Cliente {
 
+	@Id
+	@GeneratedValue
+	private Long id;	
 	private String arquivo;
 	private String cnpj;
 	private String nome;
@@ -12,6 +20,7 @@ public class Cliente {
 		// TODO Auto-generated constructor stub
 	}
 
+	
 	public Cliente(String arquivo, String cnpj, String nome, String areaNegocio) {
 		super();
 		this.arquivo = arquivo;
@@ -19,6 +28,17 @@ public class Cliente {
 		this.nome = nome;
 		this.areaNegocio = areaNegocio;
 	}
+
+
+	public Long getId() {
+		return id;
+	}
+
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
 
 	public String getArquivo() {
 		return arquivo;
@@ -54,8 +74,8 @@ public class Cliente {
 
 	@Override
 	public String toString() {
-		return "Cliente [arquivo=" + arquivo + ", cnpj=" + cnpj + ", nome=" + nome + ", areaNegocio=" + areaNegocio
-				+ "]";
+		return "Cliente [id=" + id + ", arquivo=" + arquivo + ", cnpj=" + cnpj + ", nome=" + nome + ", areaNegocio="
+				+ areaNegocio + "]";
 	}
 
 }

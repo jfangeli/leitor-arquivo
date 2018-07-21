@@ -41,8 +41,11 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import br.com.ntconsulting.leitorarquivo.model.Cliente;
+import br.com.ntconsulting.leitorarquivo.model.ClienteArquivo;
 import br.com.ntconsulting.leitorarquivo.model.Vendedor;
 import br.com.ntconsulting.leitorarquivo.model.VendedorArquivo;
+import br.com.ntconsulting.leitorarquivo.processor.ClienteItemProcessador;
 import br.com.ntconsulting.leitorarquivo.processor.VendedorItemProcessador;
 import br.com.ntconsulting.leitorarquivo.service.JobArquivoListener;
 
@@ -121,21 +124,65 @@ public class BatchConfig {
 	@Bean
 	public Job processarArquivo(@Qualifier("bJobRepository") JobRepository jobRepository, 
 			JobArquivoListener listener, 
-			@Qualifier("stepVendedor") Step stepVendedor) {
+			@Qualifier("stepVendedor") Step stepVendedor,
+			@Qualifier("stepCliente") Step stepCliente) {
 		
 		return jobBuilderFactory.get("importUserJob")
 				.repository(jobRepository)
 				.incrementer(new RunIdIncrementer())
 				.listener(listener)
 				.start(stepVendedor)
-				//.next(processarVendedores)
+				.next(stepCliente)
 				.build();
 	}
 
+	@Bean("stepCliente")
+	public Step stepCliente(ItemReader<ClienteArquivo> reader, ItemProcessor<ClienteArquivo, Cliente> processor,
+			ItemWriter<Cliente> writer) {
+		return stepBuilderFactory.get("stepVendedor")
+				.<ClienteArquivo, Cliente>chunk(100)
+				.reader(reader)
+				.processor(processor)
+				// .startLimit(3)
+				.writer(writer).build();
+	}
+		
+	@Bean
+    public FlatFileItemReader<ClienteArquivo> readerCliente() {
+        definirArquivo();
+		FileSystemResource resource = new FileSystemResource(getArquivo());
+        FlatFileItemReaderBuilder<ClienteArquivo> builder =  new FlatFileItemReaderBuilder<ClienteArquivo>()
+                .name("clienteItemReader")
+                .resource(resource)
+                .delimited()
+                .delimiter("ç")
+                .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
+        
+        builder.fieldSetMapper(new ClienteArquivo.ClienteFieldSetMapper(resource.getFilename()));
+        return builder.build();        
+    }
+
+    @Bean
+    public ClienteItemProcessador processorCliente() {
+        return new ClienteItemProcessador();
+    }
+    
+
+    @Bean
+	public JdbcBatchItemWriter<Cliente> writerCliente(@Qualifier("bDataSource") DataSource dataSource) {
+		return new JdbcBatchItemWriterBuilder<Cliente>()
+				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
+				.sql("INSERT INTO cliente (id, arquivo, cnpj, nome, areaNegocio) VALUES ((select nextval ('hibernate_sequence')), :arquivo, :cnpj, :nome, :areaNegocio)").dataSource(dataSource)
+				.build();
+	}
+		
+	
 	@Bean("stepVendedor")
 	public Step stepVendedor(ItemReader<VendedorArquivo> reader, ItemProcessor<VendedorArquivo, Vendedor> processor,
 			ItemWriter<Vendedor> writer) {
-		return stepBuilderFactory.get("stepVendedor").<VendedorArquivo, Vendedor>chunk(100).reader(reader)
+		return stepBuilderFactory.get("stepVendedor")
+				.<VendedorArquivo, Vendedor>chunk(100)
+				.reader(reader)
 				.processor(processor)
 				// .startLimit(3)
 				.writer(writer).build();
