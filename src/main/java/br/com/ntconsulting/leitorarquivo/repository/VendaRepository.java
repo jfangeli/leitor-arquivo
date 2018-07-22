@@ -14,7 +14,7 @@ public interface VendaRepository extends CrudRepository<Venda, Long>{
 
 	@Query(value = "select v2.* "
 			+"from venda v2, "
-			+"( select v.id, sum(vi.preco) from venda v, venda_item vi "
+			+"( select v.id, sum((vi.quantidade * vi.preco)) from venda v, venda_item vi "
 			+"where vi.venda_id = v.id "
 			+"and v.arquivo_id = (:pIdArquivo)  "
 			+"group by v.id "
@@ -26,10 +26,10 @@ public interface VendaRepository extends CrudRepository<Venda, Long>{
 	
 	@Query(value = "select v2.* " + 
 			"	from venda v2, " + 
-			"	( select v.nomevendedor, sum(vi.preco) from venda v, venda_item vi " + 
+			"	( select v.nomevendedor, sum((vi.quantidade * vi.preco)) from venda v, venda_item vi " + 
 			"	where vi.venda_id = v.id " + 
 			"	and v.arquivo_id = (:pIdArquivo)  " + 
-			"	group by v.id " + 
+			"	group by v.nomevendedor " + 
 			"	order by 2 asc " + 
 			"	limit 1 ) d " + 
 			"	where d.nomevendedor = v2.nomevendedor " + 

@@ -6,6 +6,8 @@ import java.io.FilenameFilter;
 import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -59,7 +61,8 @@ import br.com.ntconsulting.leitorarquivo.processor.VendedorItemProcessador;
 @EnableJpaRepositories(entityManagerFactoryRef = "bEntityManager", basePackages = {"br.com.ntconsulting.leitorarquivo.repository"})
 public class BatchConfig {
 
-
+	private static final Logger log = LoggerFactory.getLogger(BatchConfig.class);
+	
 	@Autowired
 	public JobBuilderFactory jobBuilderFactory;
 
@@ -131,6 +134,7 @@ public class BatchConfig {
 		jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());		
 		jobLauncher.afterPropertiesSet();
 		return jobLauncher;
+		
 	}
 	
 	@Bean
@@ -332,8 +336,7 @@ public class BatchConfig {
 			File[] f = file.listFiles(new FilenameFilter() {
 			    @Override
 			    public boolean accept(File dir, String name) {
-			        name.toUpperCase().endsWith(".DAT");
-			        return true;
+			        return name.toUpperCase().endsWith(".DAT");
 			    }
 			});
 			

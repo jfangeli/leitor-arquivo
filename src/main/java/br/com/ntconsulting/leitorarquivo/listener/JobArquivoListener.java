@@ -28,7 +28,10 @@ public class JobArquivoListener extends JobExecutionListenerSupport {
 		if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
 			log.info("JOB Finalizado, gerando relatorio final");
 			
+			//TODO: Pegar do contexto do Spring
 			arquivoService.gerarRelatorio(0l);
+			
+			log.info("Relatorio gerado");
 			
 		}else {
 			log.error("Erro ao processar o JOB. Status:"+jobExecution.getStatus() + ", Exist Status: "+jobExecution.getExitStatus());

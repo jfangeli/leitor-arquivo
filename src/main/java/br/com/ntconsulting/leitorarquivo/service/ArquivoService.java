@@ -58,7 +58,7 @@ public class ArquivoService {
 		arquivo.get().setQtdQcliente(clientes);
 		
 		Venda vendaMaisCara = encontrarVendaMaisCaraArquivo(arquivo.get().getId());
-		arquivo.get().setIdMaiorVenda(vendaMaisCara.getId());
+		arquivo.get().setIdMaiorVenda(vendaMaisCara.getIdVenda());
 		
 		Venda piorVendedor = encontrarPiorVendedorArquivo(arquivo.get().getId());
 		arquivo.get().setNomePiorVendedor(piorVendedor.getNomeVendedor());
@@ -67,7 +67,7 @@ public class ArquivoService {
 		
 		moverArquivo(arquivo.get());
 		
-		gerarResumo(arquivo.get());
+		gerarArquivoResumo(arquivo.get());
 		
 		
 	}
@@ -83,34 +83,18 @@ public class ArquivoService {
 		}
 				
 	}
-	
-	public ArquivoService() {
-		
-	}
 
-	public static void main(String[] args) {
-		ArquivoService s = new ArquivoService();
-		Arquivo a = new Arquivo();
-		a.setNome("/home/angeli/data/t.dat");
-		a.setIdMaiorVenda(10l);
-		a.setQtdQcliente(10);
-		a.setQtdVendedores(5);
-		a.setNomePiorVendedor("teste");
-		s.gerarResumo(a);
-	}
-	
-	public void gerarResumo(Arquivo arquivo) {
+	public void gerarArquivoResumo(Arquivo arquivo) {
 		try {
 			Path file = Paths.get(arquivo.getNome());
-			String nome = file.toFile().getName();
-			nome = nome.split(".")[0] + ".done.dat";
+			String nome = file.toFile().getName().split("\\.")[0] + ".done.dat";
 			Path newFile = Paths.get(file.toFile().getParent(), "/out/", nome);
 			Files.createDirectories(newFile.getParent());
 			//Files.createFile(newFile);
 			try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(newFile, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND))) {
 				pw.println("Clientes:"+arquivo.getQtdQcliente());
 				pw.println("Vendedores:"+arquivo.getQtdVendedores());
-				pw.println("Venda Mais Cara:"+arquivo.getIdMaiorVenda());
+				pw.println("ID Venda Mais Cara:"+arquivo.getIdMaiorVenda());
 				pw.println("Pior Vendedor:"+arquivo.getNomePiorVendedor());
 	        }
 			

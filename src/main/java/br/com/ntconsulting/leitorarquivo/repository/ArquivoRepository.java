@@ -13,7 +13,7 @@ import br.com.ntconsulting.leitorarquivo.model.Arquivo;
 @Transactional
 public interface ArquivoRepository extends JpaRepository<Arquivo, Long>{
 	
-	@Query("SELECT arq FROM Arquivo arq ORDER BY arq.id DESC LIMIT 1")
+	@Query("SELECT arq FROM Arquivo arq WHERE arq.id=(Select max(arq2.id) from Arquivo arq2 )")
 	Optional<Arquivo> findlast();
 	
 }
