@@ -2,9 +2,12 @@ package br.com.ntconsulting.leitorarquivo.model;
 
 import java.math.BigDecimal;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 
 @Entity
 public class Vendedor {
@@ -13,29 +16,31 @@ public class Vendedor {
 	@GeneratedValue
 	private Long id;
 
-	private String arquivo;
 	private String cpf;
 	private String nome;
 	private BigDecimal salario;
+
+	@ManyToOne(cascade=CascadeType.ALL)
+	@JoinColumn(name = "arquivo_id", updatable= false, insertable=true)
+	private Arquivo arquivo;
 
 	public Vendedor() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
 
-	public Vendedor(String arquivo, String cpf, String nome, BigDecimal salario) {
+	public Vendedor(String cpf, String nome, BigDecimal salario) {
 		super();
-		this.arquivo = arquivo;
 		this.cpf = cpf;
 		this.nome = nome;
 		this.salario = salario;
 	}
 
-	public String getArquivo() {
+	public Arquivo getArquivo() {
 		return arquivo;
 	}
 
-	public void setArquivo(String arquivo) {
+	public void setArquivo(Arquivo arquivo) {
 		this.arquivo = arquivo;
 	}
 
@@ -65,7 +70,7 @@ public class Vendedor {
 
 	@Override
 	public String toString() {
-		return "Vendedor [arquivo=" + arquivo + ", cpf=" + cpf + ", nome=" + nome + ", salario=" + salario + "]";
+		return "Vendedor [id=" + id + ", cpf=" + cpf + ", nome=" + nome + ", salario=" + salario + "]";
 	}
 
 }

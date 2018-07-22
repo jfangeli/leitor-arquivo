@@ -1,29 +1,34 @@
 package br.com.ntconsulting.leitorarquivo.model;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 
 @Entity
 public class Cliente {
 
 	@Id
 	@GeneratedValue
-	private Long id;	
-	private String arquivo;
+	private Long id;
 	private String cnpj;
 	private String nome;
 	private String areaNegocio;
 
+	@ManyToOne(cascade=CascadeType.ALL)
+	@JoinColumn(name = "arquivo_id", updatable= false, insertable=true)
+	private Arquivo arquivo;
+	
 	public Cliente() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
 
 	
-	public Cliente(String arquivo, String cnpj, String nome, String areaNegocio) {
-		super();
-		this.arquivo = arquivo;
+	public Cliente(String cnpj, String nome, String areaNegocio) {
+		super();		
 		this.cnpj = cnpj;
 		this.nome = nome;
 		this.areaNegocio = areaNegocio;
@@ -40,11 +45,11 @@ public class Cliente {
 	}
 
 
-	public String getArquivo() {
+	public Arquivo getArquivo() {
 		return arquivo;
 	}
 
-	public void setArquivo(String arquivo) {
+	public void setArquivo(Arquivo arquivo) {
 		this.arquivo = arquivo;
 	}
 
@@ -74,7 +79,7 @@ public class Cliente {
 
 	@Override
 	public String toString() {
-		return "Cliente [id=" + id + ", arquivo=" + arquivo + ", cnpj=" + cnpj + ", nome=" + nome + ", areaNegocio="
+		return "Cliente [id=" + id + ", cnpj=" + cnpj + ", nome=" + nome + ", areaNegocio="
 				+ areaNegocio + "]";
 	}
 

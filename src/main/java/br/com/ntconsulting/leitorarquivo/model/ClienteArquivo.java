@@ -6,6 +6,7 @@ import org.springframework.batch.item.file.transform.FieldSet;
 public class ClienteArquivo {
 
 	private String nomeArquivo;
+	private Long idArquivo;
 	private String identificador;
 	private String cnpj;
 	private String nome;
@@ -16,8 +17,10 @@ public class ClienteArquivo {
 		// TODO Auto-generated constructor stub
 	}
 
-	public ClienteArquivo(String nomeArquivo, String identificador, String cnpj, String nome, String areaNegocio) {
+	public ClienteArquivo(Long idArquivo, String nomeArquivo, String identificador, String cnpj, String nome,
+			String areaNegocio) {
 		super();
+		this.idArquivo = idArquivo;
 		this.nomeArquivo = nomeArquivo;
 		this.identificador = identificador;
 		this.cnpj = cnpj;
@@ -28,10 +31,12 @@ public class ClienteArquivo {
 	public static class ClienteFieldSetMapper implements FieldSetMapper<ClienteArquivo> {
 
 		private String nomeArquivo;
+		private Long idArquivo;
 
-		public ClienteFieldSetMapper(String nomeArquivo) {
+		public ClienteFieldSetMapper(String nomeArquivo, Long idArquivo) {
 			super();
 			this.nomeArquivo = nomeArquivo;
+			this.idArquivo = idArquivo;
 		}
 
 		public ClienteArquivo mapFieldSet(FieldSet fieldSet) {
@@ -39,6 +44,7 @@ public class ClienteArquivo {
 
 			if (null != fieldSet) {
 				cliente.setNomeArquivo(this.nomeArquivo);
+				cliente.setIdArquivo(this.idArquivo);
 				cliente.setIdentificador(fieldSet.readString(0));
 				if ("002".equals(cliente.getIdentificador())) {
 					cliente.setCnpj(fieldSet.readString(1));
@@ -48,6 +54,14 @@ public class ClienteArquivo {
 			}
 			return cliente;
 		}
+	}
+
+	public Long getIdArquivo() {
+		return idArquivo;
+	}
+
+	public void setIdArquivo(Long idArquivo) {
+		this.idArquivo = idArquivo;
 	}
 
 	public String getNomeArquivo() {
@@ -92,8 +106,8 @@ public class ClienteArquivo {
 
 	@Override
 	public String toString() {
-		return "ClienteArquivo [nomeArquivo=" + nomeArquivo + ", identificador=" + identificador + ", cnpj=" + cnpj
-				+ ", nome=" + nome + ", areaNegocio=" + areaNegocio + "]";
+		return "ClienteArquivo [nomeArquivo=" + nomeArquivo + ", idArquivo=" + idArquivo + ", identificador="
+				+ identificador + ", cnpj=" + cnpj + ", nome=" + nome + ", areaNegocio=" + areaNegocio + "]";
 	}
 
 }

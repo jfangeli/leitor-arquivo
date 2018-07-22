@@ -3,6 +3,7 @@ package br.com.ntconsulting.leitorarquivo.processor;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -10,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.item.ItemProcessor;
 
+import br.com.ntconsulting.leitorarquivo.model.Arquivo;
 import br.com.ntconsulting.leitorarquivo.model.Venda;
 import br.com.ntconsulting.leitorarquivo.model.VendaArquivo;
 import br.com.ntconsulting.leitorarquivo.model.VendaItem;
@@ -27,12 +29,11 @@ public class VendaItemProcessador implements ItemProcessor<VendaArquivo, Venda> 
 		
 		final String nomeVendedor = vendaArquivo.getNomeVendedor().toUpperCase();
 
-		final Venda vendaProcessada = new Venda(vendaArquivo.getNomeArquivo(), 
-				vendaArquivo.getId(), 
-				nomeVendedor);
-		
+		final Venda vendaProcessada = new Venda(vendaArquivo.getId(),nomeVendedor);
 		vendaProcessada.setItens( processarItensVenda(vendaArquivo.getVendaItens(), vendaProcessada) );
-
+		vendaProcessada.setArquivo(montarArquivo(vendaArquivo.getIdArquivo(), vendaArquivo.getNomeArquivo(), vendaProcessada));
+		
+		
 		log.debug("Venda processada de (" + vendaArquivo + ") para (" + vendaProcessada + ")");
 
 		return vendaProcessada;
@@ -55,13 +56,22 @@ public class VendaItemProcessador implements ItemProcessor<VendaArquivo, Venda> 
 
 		if (null != item && !item.trim().isEmpty()) {
 			String[] dados = item.split("-");
-			retorno.setId(Long.valueOf(dados[0]));
+			retorno.setIdItem(Long.valueOf(dados[0]));
 			retorno.setQuantidade(Integer.valueOf(dados[1]));
 			retorno.setPreco(new BigDecimal(dados[2]));
 			retorno.setVenda(venda);
 		}
 
 		return retorno;
-	}	
+	}
+	
+	protected Arquivo montarArquivo(Long idArquivo, String nomeArquivo, Venda venda) {
+    	Arquivo arquivo = new Arquivo();
+    	arquivo.setId(idArquivo);
+    	arquivo.setNome(nomeArquivo);
+    	arquivo.addVenda(venda);
+    	arquivo.setData(new Date());
+    	return arquivo;
+    }
 	
 }

@@ -19,9 +19,7 @@ import org.springframework.batch.core.repository.support.JobRepositoryFactoryBea
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
-import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
-import org.springframework.batch.item.database.JdbcBatchItemWriter;
-import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.batch.item.database.JpaItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +31,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.JpaVendorAdapter;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
@@ -57,6 +56,7 @@ import br.com.ntconsulting.leitorarquivo.service.JobArquivoListener;
 @EnableAutoConfiguration
 @ComponentScan
 @EnableTransactionManagement
+@EnableJpaRepositories(entityManagerFactoryRef = "bEntityManager", basePackages = {"br.com.ntconsulting.leitorarquivo.repository"})
 public class BatchConfig {
 
 
@@ -91,31 +91,33 @@ public class BatchConfig {
 		LocalContainerEntityManagerFactoryBean lef = new LocalContainerEntityManagerFactoryBean();
 		lef.setPackagesToScan("br.com.ntconsulting.leitorarquivo.model");
 		lef.setDataSource(dataSource);
+		//lef.setJtaDataSource(dataSource);
 		lef.setJpaVendorAdapter(jpaVendorAdapter);
-		//lef.setJpaProperties(new Properties());		
+		//lef.setJpaProperties(new Properties());
 		return lef;
 	}
 	
 	@Bean("bTransactionManager")
 	public PlatformTransactionManager transactionManager(@Qualifier("bEntityManager") EntityManagerFactory entityManager) {
-		return new JpaTransactionManager(entityManager);
+		return new JpaTransactionManager(entityManager	);
 	}
 	
 	@Bean("bJobRepository")
 	public JobRepository createJobRepository(@Qualifier("bDataSource") DataSource dataSource, 
 			@Qualifier("bTransactionManager") PlatformTransactionManager transactionManager) throws Exception {
 		JobRepositoryFactoryBean factory = new JobRepositoryFactoryBean();
-		factory.setDataSource(dataSource);
+		factory.setDataSource(dataSource);		
 		//factory.setDatabaseType("");
 		factory.setTransactionManager(transactionManager);
 		factory.setIsolationLevelForCreate("ISOLATION_SERIALIZABLE");
 		factory.setTablePrefix("BATCH_");
-		factory.setMaxVarCharLength(1000);
+		factory.setMaxVarCharLength(1000);		
 		return factory.getObject();
 	}
 	
 	@Bean
-	public JobLauncher createJobLauncher(@Qualifier("bJobRepository") JobRepository jobRepository) throws Exception {
+	public JobLauncher createJobLauncher(@Qualifier("bJobRepository")JobRepository jobRepository
+			) throws Exception {
 		
 		SimpleJobLauncher jobLauncher = new SimpleJobLauncher();
 		jobLauncher.setJobRepository(jobRepository);
@@ -125,29 +127,36 @@ public class BatchConfig {
 	}
 	
 	@Bean
-	public Job processarArquivo(@Qualifier("bJobRepository") JobRepository jobRepository, 
-			JobArquivoListener listener, 
-			@Qualifier("stepVendedor") Step stepVendedor,
-			@Qualifier("stepCliente") Step stepCliente) {
+	public Job processarArquivo(@Qualifier("bJobRepository")JobRepository jobRepository, 
+			JobArquivoListener listener 
+			,@Qualifier("stepVendedor") Step stepVendedor
+			,@Qualifier("stepCliente") Step stepCliente
+			,@Qualifier("stepVenda") Step stepVenda
+			) {
 		
-		return jobBuilderFactory.get("importUserJob")
+		return jobBuilderFactory.get("processarArquivoJob")
 				.repository(jobRepository)
 				.incrementer(new RunIdIncrementer())
 				.listener(listener)
 				.start(stepVendedor)
 				.next(stepCliente)
+				.next(stepVenda)
 				.build();
 	}
 	
 	@Bean("stepVenda")
-	public Step stepVenda(ItemReader<VendaArquivo> reader, ItemProcessor<VendaArquivo, Venda> processor,
-			ItemWriter<Venda> writer) {
+	public Step stepVenda(ItemReader<VendaArquivo> reader, 
+			ItemProcessor<VendaArquivo, Venda> processor,
+			ItemWriter<Venda> writer,
+			@Qualifier("bTransactionManager")PlatformTransactionManager transactionManager) {
 		return stepBuilderFactory.get("stepVenda")
 				.<VendaArquivo, Venda>chunk(100)
 				.reader(reader)
 				.processor(processor)
-				// .startLimit(3)
-				.writer(writer).build();
+				// .startLimit(3)				
+				.writer(writer)
+				.transactionManager(transactionManager)
+				.build();
 	}
 		
 	@Bean
@@ -161,7 +170,7 @@ public class BatchConfig {
                 .delimiter("ç")
                 .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
         
-        builder.fieldSetMapper(new VendaArquivo.VendaFieldSetMapper(resource.getFilename()));
+        builder.fieldSetMapper(new VendaArquivo.VendaFieldSetMapper(resource.getFilename(), getIdArquivo()));
         return builder.build();        
     }
 
@@ -172,27 +181,40 @@ public class BatchConfig {
 
     
     @Bean
-	public JdbcBatchItemWriter<Venda> writerVenda(@Qualifier("bDataSource") DataSource dataSource) {
-		
-    	return new JdbcBatchItemWriterBuilder<Venda>()
-				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-				.sql("INSERT INTO venda (id, arquivo, nomeVendedor) VALUES (:id, :arquivo, :nomeVendedor)")
-				.sql("INSERT INTO venda_item (id, quantidade, preco, venda_id) VALUES (:id, :quantidade, :preco, :venda_id)")				
-				.dataSource(dataSource)
-				.build();
+	public ItemWriter<Venda> writerVenda(
+			@Qualifier("bEntityManager") LocalContainerEntityManagerFactoryBean entityManager) {
+		JpaItemWriter<Venda> writer = new JpaItemWriter<Venda>();
+		writer.setEntityManagerFactory(entityManager.getObject());
+		return writer; 	
+				
 	}
+    
+//    @Bean
+//	public JdbcBatchItemWriter<Venda> writerVenda(@Qualifier("bDataSource") DataSource dataSource) {
+//		
+//    	return new JdbcBatchItemWriterBuilder<Venda>()
+//				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
+//				.sql("INSERT INTO venda (id, arquivo, nomeVendedor) VALUES (:id, :arquivo, :nomeVendedor)")
+//				.sql("INSERT INTO venda_item (id, quantidade, preco, venda_id) VALUES (:id, :quantidade, :preco, :venda_id)")				
+//				.dataSource(dataSource)
+//				.build();
+//	}
 	
 	
 
 	@Bean("stepCliente")
-	public Step stepCliente(ItemReader<ClienteArquivo> reader, ItemProcessor<ClienteArquivo, Cliente> processor,
-			ItemWriter<Cliente> writer) {
-		return stepBuilderFactory.get("stepVendedor")
+	public Step stepCliente(ItemReader<ClienteArquivo> reader, 
+			ItemProcessor<ClienteArquivo, Cliente> processor,
+			ItemWriter<Cliente> writer,
+			@Qualifier("bTransactionManager")PlatformTransactionManager transactionManager) {
+		return stepBuilderFactory.get("stepCliente")
 				.<ClienteArquivo, Cliente>chunk(100)
 				.reader(reader)
 				.processor(processor)
 				// .startLimit(3)
-				.writer(writer).build();
+				.writer(writer)
+				.transactionManager(transactionManager)
+				.build();
 	}
 		
 	@Bean
@@ -206,7 +228,7 @@ public class BatchConfig {
                 .delimiter("ç")
                 .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
         
-        builder.fieldSetMapper(new ClienteArquivo.ClienteFieldSetMapper(resource.getFilename()));
+        builder.fieldSetMapper(new ClienteArquivo.ClienteFieldSetMapper(resource.getFilename(), getIdArquivo()));
         return builder.build();        
     }
 
@@ -215,25 +237,37 @@ public class BatchConfig {
         return new ClienteItemProcessador();
     }
     
-
     @Bean
-	public JdbcBatchItemWriter<Cliente> writerCliente(@Qualifier("bDataSource") DataSource dataSource) {
-		return new JdbcBatchItemWriterBuilder<Cliente>()
-				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-				.sql("INSERT INTO cliente (id, arquivo, cnpj, nome, areaNegocio) VALUES ((select nextval ('hibernate_sequence')), :arquivo, :cnpj, :nome, :areaNegocio)").dataSource(dataSource)
-				.build();
+	public ItemWriter<Cliente> writerCliente(
+			@Qualifier("bEntityManager") LocalContainerEntityManagerFactoryBean entityManager) {
+		JpaItemWriter<Cliente> writer = new JpaItemWriter<Cliente>();
+		writer.setEntityManagerFactory(entityManager.getObject());
+		return writer; 	
+				
 	}
+    
+//    @Bean
+//	public JdbcBatchItemWriter<Cliente> writerCliente(@Qualifier("bDataSource") DataSource dataSource) {
+//		return new JdbcBatchItemWriterBuilder<Cliente>()
+//				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
+//				.sql("INSERT INTO cliente (id, arquivo, cnpj, nome, areaNegocio) VALUES ((select nextval ('hibernate_sequence')), :arquivo, :cnpj, :nome, :areaNegocio)").dataSource(dataSource)
+//				.build();
+//	}
 		
 	
 	@Bean("stepVendedor")
-	public Step stepVendedor(ItemReader<VendedorArquivo> reader, ItemProcessor<VendedorArquivo, Vendedor> processor,
-			ItemWriter<Vendedor> writer) {
+	public Step stepVendedor(ItemReader<VendedorArquivo> reader, 
+			ItemProcessor<VendedorArquivo, Vendedor> processor,
+			ItemWriter<Vendedor> writer, 
+			@Qualifier("bTransactionManager")PlatformTransactionManager transactionManager) {
 		return stepBuilderFactory.get("stepVendedor")
 				.<VendedorArquivo, Vendedor>chunk(100)
 				.reader(reader)
 				.processor(processor)
 				// .startLimit(3)
-				.writer(writer).build();
+				.writer(writer)
+				.transactionManager(transactionManager)
+				.build();
 	}
 	
 	@Bean
@@ -247,7 +281,7 @@ public class BatchConfig {
                 .delimiter("ç")
                 .names(new String[]{"identificador", "cpf", "nome", "salario"});
         
-        builder.fieldSetMapper(new VendedorArquivo.VendedorFieldSetMapper(resource.getFilename()));
+        builder.fieldSetMapper(new VendedorArquivo.VendedorFieldSetMapper(resource.getFilename(), getIdArquivo()));
         return builder.build();        
     }
 
@@ -255,15 +289,23 @@ public class BatchConfig {
     public VendedorItemProcessador processorVendedor() {
         return new VendedorItemProcessador();
     }
-    
-
-    @Bean
-	public JdbcBatchItemWriter<Vendedor> writerVendedor(@Qualifier("bDataSource") DataSource dataSource) {
-		return new JdbcBatchItemWriterBuilder<Vendedor>()
-				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-				.sql("INSERT INTO vendedor (id, arquivo, cpf, nome, salario) VALUES ((select nextval ('hibernate_sequence')), :arquivo, :cpf, :nome, :salario)").dataSource(dataSource)
-				.build();
+        
+	@Bean
+	public ItemWriter<Vendedor> writerVendedor(
+			@Qualifier("bEntityManager") LocalContainerEntityManagerFactoryBean entityManager) {
+		JpaItemWriter<Vendedor> writer = new JpaItemWriter<Vendedor>();
+		writer.setEntityManagerFactory(entityManager.getObject());
+		return writer; 	
+				
 	}
+
+//    @Bean
+//	public JdbcBatchItemWriter<Vendedor> writerVendedor(@Qualifier("bDataSource") DataSource dataSource) {
+//		return new JdbcBatchItemWriterBuilder<Vendedor>()
+//				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
+//				.sql("INSERT INTO vendedor (id, arquivo, cpf, nome, salario) VALUES ((select nextval ('hibernate_sequence')), :arquivo, :cpf, :nome, :salario)").dataSource(dataSource)
+//				.build();
+//	}
 	
 	protected String getArquivo() {
 		return System.getProperty("diretorio") +"/"+ System.getProperty("arquivo");
@@ -273,11 +315,16 @@ public class BatchConfig {
 		return System.getProperty("arquivo");
 	}
     
+	protected Long getIdArquivo() {
+		return Long.valueOf(System.getProperty("arquivo.id"));
+	}
+	
 	protected  void definirArquivo() {
 		String diretorio = System.getProperty("diretorio");
 		String arquivo = System.getProperty("arquivo");
+		String idArquivo = System.getProperty("arquivo.id");
 		
-		if(null == diretorio || null == arquivo) {
+		if(null == diretorio || null == arquivo || null == idArquivo) {
 			diretorio = System.getenv("HOMEPATH") + "/data";	
 			System.setProperty("diretorio", diretorio);
 			
@@ -291,6 +338,8 @@ public class BatchConfig {
 			});
 			
 			System.setProperty("arquivo",(f.length>0 ? f[0].getName() : ""));
+			
+			System.setProperty("arquivo.id", String.valueOf(System.currentTimeMillis()));
 		}
 		
 	}

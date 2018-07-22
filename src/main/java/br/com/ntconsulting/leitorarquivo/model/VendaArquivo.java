@@ -6,6 +6,7 @@ import org.springframework.batch.item.file.transform.FieldSet;
 public class VendaArquivo {
 
 	private String nomeArquivo;
+	private Long idArquivo;
 	private String identificador;
 	private Long id;
 	private String vendaItens;
@@ -16,8 +17,9 @@ public class VendaArquivo {
 		// TODO Auto-generated constructor stub
 	}
 
-	public VendaArquivo(String nomeArquivo, String identificador, Long id, String vendaItens, String nomeVendedor) {
+	public VendaArquivo(Long idArquivo, String nomeArquivo, String identificador, Long id, String vendaItens, String nomeVendedor) {
 		super();
+		this.idArquivo = idArquivo;
 		this.nomeArquivo = nomeArquivo;
 		this.identificador = identificador;
 		this.id = id;
@@ -28,9 +30,11 @@ public class VendaArquivo {
 	public static class VendaFieldSetMapper implements FieldSetMapper<VendaArquivo> {
 
 		private String nomeArquivo;
+		private Long idArquivo;
 
-		public VendaFieldSetMapper(String nomeArquivo) {
+		public VendaFieldSetMapper(String nomeArquivo, Long idArquivo) {
 			super();
+			this.idArquivo = idArquivo;
 			this.nomeArquivo = nomeArquivo;
 		}
 
@@ -39,6 +43,7 @@ public class VendaArquivo {
 
 			if (null != fieldSet) {
 				venda.setNomeArquivo(this.nomeArquivo);
+				venda.setIdArquivo(this.idArquivo);
 				venda.setIdentificador(fieldSet.readString(0));
 				if ("003".equals(venda.getIdentificador())) {
 					venda.setId(fieldSet.readLong(1));
@@ -48,6 +53,14 @@ public class VendaArquivo {
 			}
 			return venda;
 		}
+	}
+
+	public Long getIdArquivo() {
+		return idArquivo;
+	}
+
+	public void setIdArquivo(Long idArquivo) {
+		this.idArquivo = idArquivo;
 	}
 
 	public String getNomeArquivo() {
@@ -92,8 +105,8 @@ public class VendaArquivo {
 
 	@Override
 	public String toString() {
-		return "VendaArquivo [nomeArquivo=" + nomeArquivo + ", identificador=" + identificador + ", id=" + id
-				+ ", vendaItens=" + vendaItens + ", nomeVendedor=" + nomeVendedor + "]";
+		return "VendaArquivo [nomeArquivo=" + nomeArquivo + ", idArquivo=" + idArquivo + ", identificador="
+				+ identificador + ", id=" + id + ", vendaItens=" + vendaItens + ", nomeVendedor=" + nomeVendedor + "]";
 	}
 
 }

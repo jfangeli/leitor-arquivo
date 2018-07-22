@@ -8,6 +8,7 @@ import org.springframework.batch.item.file.transform.FieldSet;
 public class VendedorArquivo {
 
 	private String nomeArquivo;
+	private Long idArquivo;
 	private String identificador;
 	private String cpf;
 	private String nome;
@@ -18,8 +19,10 @@ public class VendedorArquivo {
 		// TODO Auto-generated constructor stub
 	}
 
-	public VendedorArquivo(String nomeArquivo, String identificador, String cpf, String nome, BigDecimal salario) {
+	public VendedorArquivo(Long idArquivo, String nomeArquivo, String identificador, String cpf, String nome,
+			BigDecimal salario) {
 		super();
+		this.idArquivo = idArquivo;
 		this.nomeArquivo = nomeArquivo;
 		this.identificador = identificador;
 		this.cpf = cpf;
@@ -30,19 +33,22 @@ public class VendedorArquivo {
 	public static class VendedorFieldSetMapper implements FieldSetMapper<VendedorArquivo> {
 
 		private String nomeArquivo;
+		private Long idArquivo;
 
-		public VendedorFieldSetMapper(String nomeArquivo) {
+		public VendedorFieldSetMapper(String nomeArquivo, Long idArquivo) {
 			super();
 			this.nomeArquivo = nomeArquivo;
+			this.idArquivo = idArquivo;
 		}
 
 		public VendedorArquivo mapFieldSet(FieldSet fieldSet) {
 			VendedorArquivo vendedor = new VendedorArquivo();
-			
-			if(null != fieldSet) {
+
+			if (null != fieldSet) {
 				vendedor.setNomeArquivo(this.nomeArquivo);
+				vendedor.setIdArquivo(this.idArquivo);
 				vendedor.setIdentificador(fieldSet.readString(0));
-				if("001".equals(vendedor.getIdentificador())) {
+				if ("001".equals(vendedor.getIdentificador())) {
 					vendedor.setCpf(fieldSet.readString(1));
 					vendedor.setNome(fieldSet.readString(2));
 					vendedor.setSalario(fieldSet.readBigDecimal(3));
@@ -50,6 +56,14 @@ public class VendedorArquivo {
 			}
 			return vendedor;
 		}
+	}
+
+	public Long getIdArquivo() {
+		return idArquivo;
+	}
+
+	public void setIdArquivo(Long idArquivo) {
+		this.idArquivo = idArquivo;
 	}
 
 	public String getNomeArquivo() {
@@ -94,8 +108,8 @@ public class VendedorArquivo {
 
 	@Override
 	public String toString() {
-		return "VendedorArquivo [nomeArquivo=" + nomeArquivo + ", identificador=" + identificador + ", cpf=" + cpf
-				+ ", nome=" + nome + ", salario=" + salario + "]";
+		return "VendedorArquivo [nomeArquivo=" + nomeArquivo + ", idArquivo=" + idArquivo + ", identificador="
+				+ identificador + ", cpf=" + cpf + ", nome=" + nome + ", salario=" + salario + "]";
 	}
 
 }
