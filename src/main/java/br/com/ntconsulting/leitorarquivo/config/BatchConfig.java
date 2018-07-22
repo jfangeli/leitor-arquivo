@@ -40,6 +40,7 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import br.com.ntconsulting.leitorarquivo.listener.JobArquivoListener;
 import br.com.ntconsulting.leitorarquivo.model.Cliente;
 import br.com.ntconsulting.leitorarquivo.model.ClienteArquivo;
 import br.com.ntconsulting.leitorarquivo.model.Venda;
@@ -49,7 +50,6 @@ import br.com.ntconsulting.leitorarquivo.model.VendedorArquivo;
 import br.com.ntconsulting.leitorarquivo.processor.ClienteItemProcessador;
 import br.com.ntconsulting.leitorarquivo.processor.VendaItemProcessador;
 import br.com.ntconsulting.leitorarquivo.processor.VendedorItemProcessador;
-import br.com.ntconsulting.leitorarquivo.service.JobArquivoListener;
 
 @Configuration
 @EnableBatchProcessing
@@ -65,6 +65,11 @@ public class BatchConfig {
 
 	@Autowired
 	public StepBuilderFactory stepBuilderFactory;
+		
+	private String arquivo;
+	private String diretorio;
+	private Long idArquivo;
+	
 
 	// @ConfigurationProperties(prefix = "spring.data.datasource")
 	@Bean(name = "bDataSource")
@@ -119,16 +124,18 @@ public class BatchConfig {
 	public JobLauncher createJobLauncher(@Qualifier("bJobRepository")JobRepository jobRepository
 			) throws Exception {
 		
+		definirArquivo();
+		
 		SimpleJobLauncher jobLauncher = new SimpleJobLauncher();
 		jobLauncher.setJobRepository(jobRepository);
-		jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());
+		jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());		
 		jobLauncher.afterPropertiesSet();
 		return jobLauncher;
 	}
 	
 	@Bean
-	public Job processarArquivo(@Qualifier("bJobRepository")JobRepository jobRepository, 
-			JobArquivoListener listener 
+	public Job processarArquivo(@Qualifier("bJobRepository")JobRepository jobRepository 
+			,JobArquivoListener listenerJob
 			,@Qualifier("stepVendedor") Step stepVendedor
 			,@Qualifier("stepCliente") Step stepCliente
 			,@Qualifier("stepVenda") Step stepVenda
@@ -137,7 +144,7 @@ public class BatchConfig {
 		return jobBuilderFactory.get("processarArquivoJob")
 				.repository(jobRepository)
 				.incrementer(new RunIdIncrementer())
-				.listener(listener)
+				.listener(listenerJob)
 				.start(stepVendedor)
 				.next(stepCliente)
 				.next(stepVenda)
@@ -161,7 +168,6 @@ public class BatchConfig {
 		
 	@Bean
     public FlatFileItemReader<VendaArquivo> readerVenda() {
-        definirArquivo();
 		FileSystemResource resource = new FileSystemResource(getArquivo());
         FlatFileItemReaderBuilder<VendaArquivo> builder =  new FlatFileItemReaderBuilder<VendaArquivo>()
                 .name("vendaItemReader")
@@ -170,7 +176,7 @@ public class BatchConfig {
                 .delimiter("ç")
                 .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
         
-        builder.fieldSetMapper(new VendaArquivo.VendaFieldSetMapper(resource.getFilename(), getIdArquivo()));
+        builder.fieldSetMapper(new VendaArquivo.VendaFieldSetMapper(getArquivo(), getIdArquivo()));
         return builder.build();        
     }
 
@@ -219,7 +225,6 @@ public class BatchConfig {
 		
 	@Bean
     public FlatFileItemReader<ClienteArquivo> readerCliente() {
-        definirArquivo();
 		FileSystemResource resource = new FileSystemResource(getArquivo());
         FlatFileItemReaderBuilder<ClienteArquivo> builder =  new FlatFileItemReaderBuilder<ClienteArquivo>()
                 .name("clienteItemReader")
@@ -228,7 +233,7 @@ public class BatchConfig {
                 .delimiter("ç")
                 .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
         
-        builder.fieldSetMapper(new ClienteArquivo.ClienteFieldSetMapper(resource.getFilename(), getIdArquivo()));
+        builder.fieldSetMapper(new ClienteArquivo.ClienteFieldSetMapper(getArquivo(), getIdArquivo()));
         return builder.build();        
     }
 
@@ -271,17 +276,16 @@ public class BatchConfig {
 	}
 	
 	@Bean
-    public FlatFileItemReader<VendedorArquivo> readerVendedor() {
-        definirArquivo();
+    public FlatFileItemReader<VendedorArquivo> readerVendedor() {		
 		FileSystemResource resource = new FileSystemResource(getArquivo());
         FlatFileItemReaderBuilder<VendedorArquivo> builder =  new FlatFileItemReaderBuilder<VendedorArquivo>()
                 .name("vendedorItemReader")
                 .resource(resource)
                 .delimited()
-                .delimiter("ç")
+                .delimiter("ç")                
                 .names(new String[]{"identificador", "cpf", "nome", "salario"});
         
-        builder.fieldSetMapper(new VendedorArquivo.VendedorFieldSetMapper(resource.getFilename(), getIdArquivo()));
+        builder.fieldSetMapper(new VendedorArquivo.VendedorFieldSetMapper(getArquivo(), getIdArquivo()));
         return builder.build();        
     }
 
@@ -308,25 +312,21 @@ public class BatchConfig {
 //	}
 	
 	protected String getArquivo() {
-		return System.getProperty("diretorio") +"/"+ System.getProperty("arquivo");
+		return this.diretorio +"/"+ this.arquivo;
 	}
 	
 	protected String getNomeArquivo() {
-		return System.getProperty("arquivo");
+		return this.arquivo;
 	}
     
 	protected Long getIdArquivo() {
-		return Long.valueOf(System.getProperty("arquivo.id"));
+		return this.idArquivo;
 	}
 	
 	protected  void definirArquivo() {
-		String diretorio = System.getProperty("diretorio");
-		String arquivo = System.getProperty("arquivo");
-		String idArquivo = System.getProperty("arquivo.id");
 		
 		if(null == diretorio || null == arquivo || null == idArquivo) {
 			diretorio = System.getenv("HOMEPATH") + "/data";	
-			System.setProperty("diretorio", diretorio);
 			
 			File file = new File(diretorio);
 			File[] f = file.listFiles(new FilenameFilter() {
@@ -337,9 +337,9 @@ public class BatchConfig {
 			    }
 			});
 			
-			System.setProperty("arquivo",(f.length>0 ? f[0].getName() : ""));
+			arquivo = (f.length>0 ? f[0].getName() : "");
 			
-			System.setProperty("arquivo.id", String.valueOf(System.currentTimeMillis()));
+			idArquivo = System.currentTimeMillis();
 		}
 		
 	}

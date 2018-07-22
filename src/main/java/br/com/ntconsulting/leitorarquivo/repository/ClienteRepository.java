@@ -8,12 +8,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import br.com.ntconsulting.leitorarquivo.model.Vendedor;
+import br.com.ntconsulting.leitorarquivo.model.Cliente;
 
 @Repository
 @Transactional
-public interface VendedorRepository extends CrudRepository<Vendedor, Long>{
+public interface ClienteRepository extends CrudRepository<Cliente, Long>{
+
+	@Query("SELECT cli FROM Cliente cli WHERE cli.arquivo.id=(:pIdArquivo)")
+	List<Cliente> findByArquivo(@Param("pIdArquivo") Long pIdArquivo);
 	
-	@Query("SELECT vend FROM Vendedor vend WHERE vend.arquivo.id=(:pIdArquivo)")
-	List<Vendedor> findByArquivo(@Param("pIdArquivo") Long pIdArquivo);		
 }
