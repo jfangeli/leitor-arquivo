@@ -1,8 +1,5 @@
 package br.com.ntconsulting.leitorarquivo.config;
 
-import java.io.File;
-import java.io.FilenameFilter;
-
 import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 
@@ -13,6 +10,7 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.launch.support.SimpleJobLauncher;
@@ -26,6 +24,7 @@ import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
@@ -39,6 +38,7 @@ import org.springframework.orm.jpa.JpaVendorAdapter;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.Database;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
@@ -59,6 +59,7 @@ import br.com.ntconsulting.leitorarquivo.processor.VendedorItemProcessador;
 @ComponentScan
 @EnableTransactionManagement
 @EnableJpaRepositories(entityManagerFactoryRef = "bEntityManager", basePackages = {"br.com.ntconsulting.leitorarquivo.repository"})
+@EnableScheduling
 public class BatchConfig {
 
 	private static final Logger log = LoggerFactory.getLogger(BatchConfig.class);
@@ -68,11 +69,6 @@ public class BatchConfig {
 
 	@Autowired
 	public StepBuilderFactory stepBuilderFactory;
-		
-	private String arquivo;
-	private String diretorio;
-	private Long idArquivo;
-	
 
 	// @ConfigurationProperties(prefix = "spring.data.datasource")
 	@Bean(name = "bDataSource")
@@ -126,9 +122,6 @@ public class BatchConfig {
 	@Bean
 	public JobLauncher createJobLauncher(@Qualifier("bJobRepository")JobRepository jobRepository
 			) throws Exception {
-		
-		definirArquivo();
-		
 		SimpleJobLauncher jobLauncher = new SimpleJobLauncher();
 		jobLauncher.setJobRepository(jobRepository);
 		jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());		
@@ -144,15 +137,15 @@ public class BatchConfig {
 			,@Qualifier("stepCliente") Step stepCliente
 			,@Qualifier("stepVenda") Step stepVenda
 			) {
-		
-		return jobBuilderFactory.get("processarArquivoJob")
+		 
+		 return jobBuilderFactory.get("processarArquivoJob")
 				.repository(jobRepository)
 				.incrementer(new RunIdIncrementer())
 				.listener(listenerJob)
 				.start(stepVendedor)
 				.next(stepCliente)
 				.next(stepVenda)
-				.build();
+				.build();		 
 	}
 	
 	@Bean("stepVenda")
@@ -169,10 +162,13 @@ public class BatchConfig {
 				.transactionManager(transactionManager)
 				.build();
 	}
-		
+	
+	@StepScope
 	@Bean
-    public FlatFileItemReader<VendaArquivo> readerVenda() {
-		FileSystemResource resource = new FileSystemResource(getArquivo());
+    public FlatFileItemReader<VendaArquivo> readerVenda(
+    		@Value("#{jobParameters['arquivo']}") String arquivo,
+    		@Value("#{jobParameters['arquivo.id']}") Long idArquivo) {
+		FileSystemResource resource = new FileSystemResource(arquivo);
         FlatFileItemReaderBuilder<VendaArquivo> builder =  new FlatFileItemReaderBuilder<VendaArquivo>()
                 .name("vendaItemReader")
                 .resource(resource)
@@ -180,7 +176,7 @@ public class BatchConfig {
                 .delimiter("ç")
                 .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
         
-        builder.fieldSetMapper(new VendaArquivo.VendaFieldSetMapper(getArquivo(), getIdArquivo()));
+        builder.fieldSetMapper(new VendaArquivo.VendaFieldSetMapper(arquivo, idArquivo));
         return builder.build();        
     }
 
@@ -198,19 +194,6 @@ public class BatchConfig {
 		return writer; 	
 				
 	}
-    
-//    @Bean
-//	public JdbcBatchItemWriter<Venda> writerVenda(@Qualifier("bDataSource") DataSource dataSource) {
-//		
-//    	return new JdbcBatchItemWriterBuilder<Venda>()
-//				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-//				.sql("INSERT INTO venda (id, arquivo, nomeVendedor) VALUES (:id, :arquivo, :nomeVendedor)")
-//				.sql("INSERT INTO venda_item (id, quantidade, preco, venda_id) VALUES (:id, :quantidade, :preco, :venda_id)")				
-//				.dataSource(dataSource)
-//				.build();
-//	}
-	
-	
 
 	@Bean("stepCliente")
 	public Step stepCliente(ItemReader<ClienteArquivo> reader, 
@@ -227,9 +210,12 @@ public class BatchConfig {
 				.build();
 	}
 		
+	@StepScope
 	@Bean
-    public FlatFileItemReader<ClienteArquivo> readerCliente() {
-		FileSystemResource resource = new FileSystemResource(getArquivo());
+    public FlatFileItemReader<ClienteArquivo> readerCliente(
+    		@Value("#{jobParameters['arquivo']}") String arquivo,
+    		@Value("#{jobParameters['arquivo.id']}") Long idArquivo) {
+		FileSystemResource resource = new FileSystemResource(arquivo);
         FlatFileItemReaderBuilder<ClienteArquivo> builder =  new FlatFileItemReaderBuilder<ClienteArquivo>()
                 .name("clienteItemReader")
                 .resource(resource)
@@ -237,7 +223,7 @@ public class BatchConfig {
                 .delimiter("ç")
                 .names(new String[]{"identificador", "cnpj", "nome", "areaNegocio"});
         
-        builder.fieldSetMapper(new ClienteArquivo.ClienteFieldSetMapper(getArquivo(), getIdArquivo()));
+        builder.fieldSetMapper(new ClienteArquivo.ClienteFieldSetMapper(arquivo, idArquivo));
         return builder.build();        
     }
 
@@ -254,15 +240,6 @@ public class BatchConfig {
 		return writer; 	
 				
 	}
-    
-//    @Bean
-//	public JdbcBatchItemWriter<Cliente> writerCliente(@Qualifier("bDataSource") DataSource dataSource) {
-//		return new JdbcBatchItemWriterBuilder<Cliente>()
-//				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-//				.sql("INSERT INTO cliente (id, arquivo, cnpj, nome, areaNegocio) VALUES ((select nextval ('hibernate_sequence')), :arquivo, :cnpj, :nome, :areaNegocio)").dataSource(dataSource)
-//				.build();
-//	}
-		
 	
 	@Bean("stepVendedor")
 	public Step stepVendedor(ItemReader<VendedorArquivo> reader, 
@@ -279,9 +256,13 @@ public class BatchConfig {
 				.build();
 	}
 	
+	@StepScope
 	@Bean
-    public FlatFileItemReader<VendedorArquivo> readerVendedor() {		
-		FileSystemResource resource = new FileSystemResource(getArquivo());
+    public FlatFileItemReader<VendedorArquivo> readerVendedor(
+    		@Value("#{jobParameters['arquivo']}") String arquivo,
+    		@Value("#{jobParameters['arquivo.id']}") Long idArquivo) {
+		
+		FileSystemResource resource = new FileSystemResource(arquivo);
         FlatFileItemReaderBuilder<VendedorArquivo> builder =  new FlatFileItemReaderBuilder<VendedorArquivo>()
                 .name("vendedorItemReader")
                 .resource(resource)
@@ -289,7 +270,7 @@ public class BatchConfig {
                 .delimiter("ç")                
                 .names(new String[]{"identificador", "cpf", "nome", "salario"});
         
-        builder.fieldSetMapper(new VendedorArquivo.VendedorFieldSetMapper(getArquivo(), getIdArquivo()));
+        builder.fieldSetMapper(new VendedorArquivo.VendedorFieldSetMapper(arquivo, idArquivo));
         return builder.build();        
     }
 
@@ -305,46 +286,6 @@ public class BatchConfig {
 		writer.setEntityManagerFactory(entityManager.getObject());
 		return writer; 	
 				
-	}
-
-//    @Bean
-//	public JdbcBatchItemWriter<Vendedor> writerVendedor(@Qualifier("bDataSource") DataSource dataSource) {
-//		return new JdbcBatchItemWriterBuilder<Vendedor>()
-//				.itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-//				.sql("INSERT INTO vendedor (id, arquivo, cpf, nome, salario) VALUES ((select nextval ('hibernate_sequence')), :arquivo, :cpf, :nome, :salario)").dataSource(dataSource)
-//				.build();
-//	}
-	
-	protected String getArquivo() {
-		return this.diretorio +"/"+ this.arquivo;
-	}
-	
-	protected String getNomeArquivo() {
-		return this.arquivo;
-	}
-    
-	protected Long getIdArquivo() {
-		return this.idArquivo;
-	}
-	
-	protected  void definirArquivo() {
-		
-		if(null == diretorio || null == arquivo || null == idArquivo) {
-			diretorio = System.getenv("HOMEPATH") + "/data";	
-			
-			File file = new File(diretorio);
-			File[] f = file.listFiles(new FilenameFilter() {
-			    @Override
-			    public boolean accept(File dir, String name) {
-			        return name.toUpperCase().endsWith(".DAT");
-			    }
-			});
-			
-			arquivo = (f.length>0 ? f[0].getName() : "");
-			
-			idArquivo = System.currentTimeMillis();
-		}
-		
 	}
 
 }

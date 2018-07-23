@@ -26,15 +26,16 @@ public class JobArquivoListener extends JobExecutionListenerSupport {
 	@Override
 	public void afterJob(JobExecution jobExecution) {
 		if(jobExecution.getStatus() == BatchStatus.COMPLETED) {
-			log.info("JOB Finalizado, gerando relatorio final");
+			Long idArquivo = jobExecution.getJobParameters().getLong("arquivo.id");
 			
-			//TODO: Pegar do contexto do Spring
-			arquivoService.gerarRelatorio(0l);
+			log.info("JOB FINALIZADO, GERANDO RELATORIO FINAL PARA ID ARQUIVO "+idArquivo);
 			
-			log.info("Relatorio gerado");
+			arquivoService.gerarRelatorio(idArquivo);
+			
+			log.info("RELATORIO GERADO ID ARQUIVO "+idArquivo);
 			
 		}else {
-			log.error("Erro ao processar o JOB. Status:"+jobExecution.getStatus() + ", Exist Status: "+jobExecution.getExitStatus());
+			log.error("ERRO AO PROCESSAR JOB. Status:"+jobExecution.getStatus() + ", Exist Status: "+jobExecution.getExitStatus());
 		}
 	}
 }
