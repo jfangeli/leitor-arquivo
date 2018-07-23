@@ -70,7 +70,13 @@ Os passos abaixo sao apenas do app, deve ser instalado anteriormente o banco de
 dados Postgresql e alterar as configuracoes de conexao na app.
  
 1) Realizar o clone
-2) mvn -Dmaven.skip.test=true clean instal  (no test por hora)
+2) Ajustar configs conexao banco
+2) mvn clean install -Dmaven.test.skip=true  (no test por hora)
 3) Definir o diretorio dos arquivos HOMEPATH ou, caso queira, pode ser passado 
    como parametro homepath ao iniciar o app.
-4) 
+4) java -jar leitor-arquivo-0.0.1-SNAPSHOT.jar -Dhomepath=/algum/diretorio   **
+5) acessar http://localhost/ativar ou http://localhost/desativar para ativar e 
+   desativar a leitura
+
+
+**Caso nao seja passado homepath, definir HOMEPATH no sistema
