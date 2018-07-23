@@ -60,10 +60,15 @@ Exemplo de arquivo
 *necessario alterar configs de conexao com banco postgresql
 
 
+
+
 ##Tecnologia
 Java Spring Boot + Spring Batch
 JPA
 PostgreSQL
+
+
+
 
 ##Rodando
 Os passos abaixo sao apenas do app, deve ser instalado anteriormente o banco de
